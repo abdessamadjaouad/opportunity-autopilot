@@ -1,0 +1,28 @@
+\documentclass[a4paper,10pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[default]{lato}
+\usepackage[a4paper,left=1.4cm,right=1.4cm,top=1.05cm,bottom=1.05cm]{geometry}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{microtype}
+\DisableLigatures{encoding = *, family = *}
+\input{glyphtounicode}
+\pdfgentounicode=1
+\pdfinfo{/Creator (Opportunity Autopilot controlled template)}
+\definecolor{accent}{RGB}{43,78,92}
+\definecolor{muted}{RGB}{91,101,106}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+\setlength{\emergencystretch}{1.5em}
+\hyphenpenalty=10000
+\exhyphenpenalty=10000
+\raggedright
+\newcommand{\docsection}[1]{\par\vspace{5pt}{\color{accent}\fontsize{10.2}{11.2}\selectfont\bfseries #1}\par\vspace{1pt}{\color{muted}\hrule}\vspace{3pt}}
+\newcommand{\docentry}[4]{{\bfseries #1}\hfill{\color{muted}#2}\par{\itshape #3}\hfill{\color{muted}#4}\par}
+\newenvironment{docitems}{\begin{itemize}[leftmargin=11pt,itemsep=1pt,topsep=2pt,parsep=0pt,partopsep=0pt]}{\end{itemize}\vspace{-1pt}}
+\begin{document}
+\fontsize{9.6}{10.8}\selectfont
+@@BODY@@
+\end{document}
