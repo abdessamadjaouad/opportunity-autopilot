@@ -203,6 +203,23 @@ The first run asks for an owner password in the terminal. Use at least 12 charac
 
 Open [http://127.0.0.1:8000](http://127.0.0.1:8000). `run.sh` starts the dashboard API and background worker together. Press `Ctrl+C` to stop both.
 
+## Reset the owner password
+
+The owner password cannot be recovered because only a salted hash is stored. To replace a forgotten or mistyped password, stop the app with `Ctrl+C`, then run:
+
+```bash
+cd opportunity-autopilot
+.venv/bin/python -m app setup
+```
+
+Enter and repeat a new password of at least 12 characters. Start the app again:
+
+```bash
+./run.sh
+```
+
+The reset invalidates existing browser sessions. The local password record is stored at `data/secrets/owner.json`; do not edit it manually or commit it.
+
 ## Import a profile
 
 Set the directory containing the candidate's CVs and supporting documents in `.env`:
