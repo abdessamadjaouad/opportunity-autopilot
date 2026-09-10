@@ -1,0 +1,92 @@
+x-runtime: &runtime
+  build:
+    context: .
+    args:
+      APP_UID: ${OA_UID:-1000}
+  restart: unless-stopped
+  user: "${OA_UID:-1000}:${OA_UID:-1000}"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs: [/tmp:size=512m, /home/autopilot:size=32m]
+  environment: &environment
+    OA_PRODUCTION: "true"
+    OA_PUBLIC_URL: ${OA_PUBLIC_URL:-https://localhost:8443}
+    OA_DATA_DIR: /app/data
+    OA_PORTFOLIO_ROOT: /app/portfolio
+    OA_DATABASE_URL_FILE: /run/secrets/database_url
+    OA_SECRET_KEY_FILE: /run/secrets/app_key
+    OA_OWNER_FILE: /run/secrets/owner
+    OA_REDIS_URL: redis://redis:6379/0
+    OA_LIVE_SUBMISSIONS_ENABLED: "false"
+    OA_PAID_SERVICES_ENABLED: "false"
+  secrets: [database_url, app_key, owner]
+  volumes: [app_data:/app/data]
+  depends_on:
+    postgres: {condition: service_healthy}
+    redis: {condition: service_healthy}
+  networks: [internal, egress]
+
+services:
+  api:
+    <<: *runtime
+    healthcheck:
+      test: [CMD, python, -c, "import os,urllib.request,urllib.parse; r=urllib.request.Request('http://127.0.0.1:8000/api/v1/health',headers={'Host':urllib.parse.urlsplit(os.environ['OA_PUBLIC_URL']).netloc}); urllib.request.urlopen(r,timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  worker:
+    <<: *runtime
+    command: [celery, -A, app.workers.celery_app:celery_app, worker, --loglevel=WARNING, --concurrency=2]
+    # Required for unprivileged bubblewrap user namespaces; renderer still fails closed.
+    security_opt: [no-new-privileges:true, seccomp=unconfined]
+  beat:
+    <<: *runtime
+    command: [celery, -A, app.workers.celery_app:celery_app, beat, --loglevel=WARNING, --schedule=/app/data/celerybeat-schedule]
+  postgres:
+    image: postgres:18.6-bookworm@sha256:1c59e2c3c818eaa0f0628f695b36e7c9e362d6b219b36a54a32df645cbd7e1af
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: autopilot
+      POSTGRES_USER: autopilot
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes: [postgres_data:/var/lib/postgresql]
+    networks: [internal]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U autopilot -d autopilot"]
+      interval: 10s
+      retries: 5
+  redis:
+    image: redis:8.2-alpine@sha256:30abb90e62f14b737010746def3ba99cc79fe19dcdb3d37b41f21fc62e7da19d
+    command: [redis-server, --appendonly, "yes", --maxmemory, 128mb, --maxmemory-policy, noeviction]
+    restart: unless-stopped
+    volumes: [redis_data:/data]
+    networks: [internal]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 10s
+      retries: 5
+  https:
+    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    restart: unless-stopped
+    ports: ["127.0.0.1:8443:443"]
+    volumes: ["./ops/Caddyfile:/etc/caddy/Caddyfile:ro", caddy_data:/data, caddy_config:/config]
+    networks: [internal]
+    depends_on:
+      api: {condition: service_healthy}
+
+networks:
+  internal: {internal: true}
+  egress: {}
+volumes:
+  app_data: {}
+  postgres_data: {}
+  redis_data: {}
+  caddy_data: {}
+  caddy_config: {}
+secrets:
+  db_password: {file: "${OA_SECRETS_DIR:?Set private external secrets directory}/db_password"}
+  database_url: {file: "${OA_SECRETS_DIR}/database_url"}
+  app_key: {file: "${OA_SECRETS_DIR}/app_key"}
+  owner: {file: "${OA_SECRETS_DIR}/owner.json"}

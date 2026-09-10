@@ -14,5 +14,7 @@ web/dist/
 web/test-results/
 web/playwright-report/
 web/*.tsbuildinfo
+docs/PROGRESS.md
+docs/SKILL_REVIEW.md
 *.sqlite*
 *.log
