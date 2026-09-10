@@ -1,11 +1,13 @@
 import io
 
 import pytest
+from fastapi.testclient import TestClient
 from pypdf import PdfWriter
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
 from app.models import AuditEvent
+from app.api.main import create_app
 from app.security.auth import ensure_key, set_owner_password
 from app.security.urls import canonical_url
 
@@ -33,6 +35,17 @@ def test_spaces_in_owner_password_are_preserved(client, settings):
     set_owner_password(settings, " fixture password with spaces ")
     assert client.post("/api/v1/login", json={"password": " fixture password with spaces "}).status_code == 200
     assert client.post("/api/v1/login", json={"password": "fixture password with spaces"}).status_code == 401
+
+
+def test_localhost_and_numeric_loopback_share_the_configured_development_port(settings, db):
+    local = settings.model_copy(update={"public_url": "http://127.0.0.1:8000"})
+    with TestClient(create_app(local, db)) as browser:
+        for origin in ("http://127.0.0.1:8000", "http://localhost:8000"):
+            response = browser.post("/api/v1/login", json={"password": "fixture-owner-password"},
+                                    headers={"Origin": origin})
+            assert response.status_code == 200
+        assert browser.post("/api/v1/login", json={"password": "fixture-owner-password"},
+                            headers={"Origin": "http://localhost:8001"}).status_code == 403
 
 
 @pytest.mark.parametrize("host", ["localhost", "jobs.localhost", "localhost.localdomain", "2130706433",

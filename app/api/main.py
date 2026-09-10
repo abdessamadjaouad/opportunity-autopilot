@@ -27,6 +27,19 @@ from app.security.urls import canonical_url
 from app import services as svc
 
 
+def _allowed_origins(settings):
+    configured = settings.public_url.rstrip("/")
+    allowed = {configured}
+    if settings.production:
+        return allowed
+    allowed.update({"http://127.0.0.1:5173", "http://localhost:5173", "http://testserver"})
+    parsed = urlsplit(configured)
+    if parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost"}:
+        port = f":{parsed.port}" if parsed.port else ""
+        allowed.update({f"http://127.0.0.1{port}", f"http://localhost{port}"})
+    return allowed
+
+
 def create_app(settings: Settings | None = None, database: Database | None = None):
     settings = settings or Settings()
     settings.validate_runtime()
@@ -64,10 +77,7 @@ def create_app(settings: Settings | None = None, database: Database | None = Non
         mutation = request.method not in {"GET", "HEAD", "OPTIONS"}
         if mutation:
             origin = request.headers.get("origin")
-            allowed = {settings.public_url.rstrip("/")}
-            if not settings.production:
-                allowed.update({"http://127.0.0.1:5173", "http://localhost:5173", "http://testserver"})
-            if origin and origin not in allowed:
+            if origin and origin not in _allowed_origins(settings):
                 return JSONResponse({"detail": "Untrusted request origin"}, status_code=403)
             try:
                 size = int(request.headers.get("content-length", "0"))
