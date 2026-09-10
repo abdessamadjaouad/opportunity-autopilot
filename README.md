@@ -29,13 +29,127 @@ Opportunity Autopilot imports a candidate profile from existing documents, disco
 
 ### Omarchy / Arch Linux
 
-Opportunity Autopilot was developed and tested on Omarchy. Install every required system package through Omarchy's package command:
+Opportunity Autopilot was developed and tested on Omarchy. Use this complete installation path on a fresh Omarchy system.
+
+#### 1. Install system packages
+
+Open a terminal and install the required packages from the configured Arch repositories:
 
 ```bash
-omarchy pkg add python uv nodejs npm bubblewrap texlive-xetex texlive-latexextra texlive-fontsextra poppler
+omarchy pkg add git curl python uv nodejs npm bubblewrap texlive-xetex texlive-latexextra texlive-fontsextra poppler
 ```
 
-`texlive-fontsextra` supplies the Lato files used by generated PDFs. Omarchy already provides the supported Arch Linux environment; no Hyprland or desktop configuration changes are required. Continue with step 1 below after the command finishes.
+`texlive-fontsextra` supplies the Lato files used by generated PDFs. No Hyprland, terminal, theme, or other desktop configuration changes are required.
+
+Confirm the packages and tools are available:
+
+```bash
+omarchy pkg present git curl python uv nodejs npm bubblewrap texlive-xetex texlive-latexextra texlive-fontsextra poppler
+python --version
+uv --version
+node --version
+npm --version
+xelatex --version
+bwrap --version
+kpsewhich lato.sty
+```
+
+Python must be 3.12 or newer and Node.js must be 24 or newer.
+
+#### 2. Clone the repository
+
+```bash
+git clone https://github.com/abdessamadjaouad/opportunity-autopilot.git
+cd opportunity-autopilot
+```
+
+#### 3. Create the Python environment
+
+Install the exact locked Python dependencies into `.venv`:
+
+```bash
+uv sync --frozen
+```
+
+#### 4. Install the dashboard dependencies
+
+```bash
+npm --prefix web ci
+npm --prefix web run build
+```
+
+#### 5. Install the tested Playwright browser
+
+```bash
+.venv/bin/playwright install chromium
+```
+
+Playwright manages this Chromium build separately from the system browser. Do not use `playwright install --with-deps` on Arch; the required system libraries were installed through `omarchy pkg add` above.
+
+#### 6. Create the local configuration
+
+```bash
+cp .env.example .env
+chmod 600 .env
+```
+
+The checked-in defaults bind only to `127.0.0.1`, use SQLite under `data/`, and disable live submissions and paid services.
+
+To import an existing portfolio, add its absolute path to `.env`:
+
+```dotenv
+OA_PORTFOLIO_ROOT=/home/your-user/path/to/portfolio
+```
+
+Then import it:
+
+```bash
+.venv/bin/python -m app import-profile
+```
+
+This step is optional. You can create and reconcile profile facts in the dashboard instead.
+
+#### 7. Start Opportunity Autopilot
+
+```bash
+./run.sh
+```
+
+On the first run, enter and repeat an owner password of at least 12 characters in the terminal. The script initializes the database, starts the private dashboard, and starts the background worker.
+
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Press `Ctrl+C` in the terminal to stop the API and worker.
+
+#### 8. Verify the installation
+
+In a second terminal:
+
+```bash
+cd opportunity-autopilot
+curl --fail http://127.0.0.1:8000/api/v1/health
+```
+
+Expected response:
+
+```json
+{"status":"ok","version":"0.1.0"}
+```
+
+Run the automated checks when needed:
+
+```bash
+.venv/bin/pytest -q
+.venv/bin/ruff check app tests migrations ops
+npm --prefix web test
+npm --prefix web run build
+```
+
+If an Omarchy package or system command is unavailable, collect diagnostics with:
+
+```bash
+omarchy debug --no-sudo --print
+```
+
+Application data stays in `data/`. Back up that directory before replacing or moving the installation. Never commit `.env`, `data/`, OAuth credentials, generated application documents, or backup keys.
 
 ### Debian / Ubuntu
 
